@@ -1,0 +1,7 @@
+# macOS
+.DS_Store
+
+# Optional: uncomment if you don't want to track these
+# *.pyc
+# __pycache__/
+# .env

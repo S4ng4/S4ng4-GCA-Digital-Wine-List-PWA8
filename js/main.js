@@ -1034,13 +1034,16 @@ class WineListApp {
         // Update wine image
         this.updateWineImage(wine);
 
-        // Update tasting notes (includes wine description) - defer to next tick to ensure DOM is fully ready
+        // Update wine description (DESCRIPTION section)
+        this.updateWineDescription(wine);
+
+        // Format line under title (Formato: from wine_name or wine_description)
+        this.updateWineFormatLine(wine);
+
+        // Update tasting notes popup content (no button; Tasting Notes shown inline in wineMeta)
         requestAnimationFrame(() => {
             this.updateTastingNotes(wine);
         });
-
-        // Update quick info div next to wine name (body + tagline)
-        this.updateWineQuickInfo(wine);
 
         // Update wine information (for popup)
         this.updateWineInformation(wine);
@@ -1066,6 +1069,17 @@ class WineListApp {
         this.updateBackButton(wine);
     }
 
+    /** Derive format (e.g. 375ml) from wine_name or wine_description */
+    deriveFormat(wine) {
+        if (!wine) return '';
+        const fromName = (wine.wine_name || '').match(/(\d+)\s*ml/i);
+        if (fromName) return fromName[1] + 'ml';
+        const desc = (wine.wine_description || '').trim();
+        const fromDesc = desc.match(/^(\d+)\s*ml$/i);
+        if (fromDesc) return fromDesc[1] + 'ml';
+        return '';
+    }
+
     updateMetaInfo(wine) {
         // Show key information: Producer, Region, Grape, Vintage, Alcohol (layout come in figura)
         const vintage = this.extractYear(wine.wine_vintage) || 'N/A';
@@ -1083,12 +1097,14 @@ class WineListApp {
         const priceValue = displayPrice !== 'N/A' ? `$${displayPrice}` : 'N/A';
         
         const bodyDisplay = wine.body && String(wine.body).trim() ? this.formatTastingText(wine.body) : null;
+        const formatDisplay = this.deriveFormat(wine);
         const metaItems = [
             { label: 'Producer', value: wine.wine_producer || 'N/A', show: true },
             { label: 'Region', value: wine.region || 'N/A', show: true },
             { label: 'Grape', value: wine.varietals || 'N/A', show: !!wine.varietals },
             { label: 'Vintage', value: vintage, show: true },
             { label: 'Denomination', value: denomination, show: !!denomination },
+            { label: 'Formato', value: formatDisplay, show: !!formatDisplay },
             { label: 'Body', value: bodyDisplay, show: !!bodyDisplay },
             { label: 'Alcohol', value: alcohol, show: !!wine.alcohol },
             { label: 'Price', value: priceValue, show: true }
@@ -1114,13 +1130,26 @@ class WineListApp {
     updateWineDescription(wine) {
         const descriptionContainer = document.getElementById('wineDescription');
         if (descriptionContainer) {
-            const description = wine.wine_description || wine.wine_description_short || 'A fine wine selection from our curated collection.';
+            const description = wine.wine_description || wine.wine_description_short || '';
             if (description && description.trim()) {
-                descriptionContainer.innerHTML = `<p>${description}</p>`;
+                descriptionContainer.innerHTML = `<p>${this.escapeHtml(this.formatTastingText(description))}</p>`;
                 descriptionContainer.style.display = 'block';
             } else {
                 descriptionContainer.style.display = 'none';
             }
+        }
+    }
+
+    updateWineFormatLine(wine) {
+        const formatEl = document.getElementById('wineFormatLine');
+        if (!formatEl) return;
+        const format = this.deriveFormat(wine);
+        if (format) {
+            formatEl.textContent = `Formato: ${format}`;
+            formatEl.style.display = '';
+        } else {
+            formatEl.textContent = '';
+            formatEl.style.display = 'none';
         }
     }
 
@@ -1259,30 +1288,12 @@ class WineListApp {
     }
 
     updateTastingNotes(wine) {
-        const tastingNotesPopupBody = document.getElementById('tastingNotesPopupBody');
-        const tastingNotesPopup = document.getElementById('tastingNotesPopup');
-        const wineImageSection = document.querySelector('.wine-image-section');
-        const wineImageContainer = document.getElementById('wineImageContainer');
-        if (!tastingNotesPopupBody || !tastingNotesPopup || !wineImageSection || !wineImageContainer) return;
-
         const notes = wine.tasting_notes;
         const hasStructuredNotes = notes && (notes.visual || notes.olfactory || notes.gustatory);
         const body = wine.body && String(wine.body).trim() ? this.formatTastingText(wine.body) : null;
 
-        const buttonHtml = `
-            <button type="button" class="tasting-notes-header" id="tastingNotesToggle" aria-haspopup="dialog" aria-controls="tastingNotesPopup">
-                <span class="tasting-notes-header-text">Tasting Notes</span>
-                <span class="tasting-notes-header-icon" aria-hidden="true"></span>
-            </button>
-        `;
-
-        const removeExistingButton = () => {
-            const existing = document.getElementById('tastingNotesToggle');
-            if (existing) existing.remove();
-        };
-
+        let panelHtml = '';
         if (hasStructuredNotes || body) {
-            let panelHtml = '';
             if (body) {
                 panelHtml += `<div class="tasting-category"><span class="tasting-label">Body</span><span class="tasting-value">${this.escapeHtml(body)}</span></div>`;
             }
@@ -1294,23 +1305,30 @@ class WineListApp {
                 if (olfactory) panelHtml += `<div class="tasting-category"><span class="tasting-label">Olfactory</span><span class="tasting-value">${this.escapeHtml(olfactory)}</span></div>`;
                 if (gustatory) panelHtml += `<div class="tasting-category"><span class="tasting-label">Gustatory</span><span class="tasting-value">${this.escapeHtml(gustatory)}</span></div>`;
             }
-            tastingNotesPopupBody.innerHTML = `<div class="tasting-notes-panel-inner">${panelHtml}</div>`;
-            removeExistingButton();
-            wineImageContainer.insertAdjacentHTML('beforebegin', buttonHtml);
-            this.setupTastingNotesPopup();
-            return;
+        } else {
+            const wineDescription = wine.wine_description || 'A fine wine selection from our curated collection.';
+            const descFormatted = this.formatTastingText(wineDescription);
+            if (descFormatted && descFormatted !== 'A fine wine selection from our curated collection.') {
+                panelHtml = `<div class="tasting-category elegant-message"><span class="tasting-value">${this.escapeHtml(descFormatted)}</span></div>`;
+            }
         }
 
-        // Fallback: show wine_description as before
-        let wineDescription = wine.wine_description || 'A fine wine selection from our curated collection.';
-        wineDescription = this.formatTastingText(wineDescription);
-        if (wineDescription && wineDescription !== 'A fine wine selection from our curated collection.') {
-            tastingNotesPopupBody.innerHTML = `<div class="tasting-notes-panel-inner"><div class="tasting-category elegant-message"><span class="tasting-value">${this.escapeHtml(wineDescription)}</span></div></div>`;
-            removeExistingButton();
-            wineImageContainer.insertAdjacentHTML('beforebegin', buttonHtml);
-            this.setupTastingNotesPopup();
-        } else {
-            removeExistingButton();
+        // Inline Tasting Notes in the page (sempre visibili)
+        const inlineEl = document.getElementById('wineTastingNotesContent');
+        if (inlineEl) {
+            if (panelHtml) {
+                inlineEl.innerHTML = panelHtml;
+                inlineEl.style.display = '';
+            } else {
+                inlineEl.innerHTML = '';
+                inlineEl.style.display = 'none';
+            }
+        }
+
+        // Popup (per eventuale uso futuro)
+        const tastingNotesPopupBody = document.getElementById('tastingNotesPopupBody');
+        if (tastingNotesPopupBody && panelHtml) {
+            tastingNotesPopupBody.innerHTML = `<div class="tasting-notes-panel-inner">${panelHtml}</div>`;
         }
     }
 
@@ -3884,6 +3902,9 @@ function getItalianRegionNameForDisplay(regionName) {
     return raw.split('/')[0].trim();
 }
 
+// Regions whose label is shifted 7px to the right (desktop + mobile)
+const REGION_LABEL_OFFSET_RIGHT_KEYS = ['valle d\'aosta', 'piemonte', 'liguria'];
+
 // Add region labels for desktop map
 function addDesktopRegionLabels(geojson) {
     if (!mapInstance || !geojson) return;
@@ -3953,9 +3974,11 @@ function addDesktopRegionLabels(geojson) {
         const labelWidth = getLabelWidth(displayRegionName);
         const iconSize = [labelWidth, 30];
         
-        // Create custom icon for label (using desktop class)
+        // 7px a destra per Valle d'Aosta, Piemonte, Liguria
+        const offsetRight = REGION_LABEL_OFFSET_RIGHT_KEYS.some(k => normalizedName.includes(k));
+        const labelClassName = 'desktop-region-label' + (offsetRight ? ' region-label-offset-right' : '');
         const labelIcon = L.divIcon({
-            className: 'desktop-region-label',
+            className: labelClassName,
             html: `<div class="desktop-region-label-text">${displayRegionName}</div>`,
             iconSize: iconSize,
             iconAnchor: [iconSize[0] / 2, iconSize[1] / 2]
@@ -4651,9 +4674,9 @@ function initInteractiveMap() {
             return;
         }
         // Initialize map with uniform touch/mouse interactions
-        // Set maxZoom based on device type (32 for tablets, 10 for others)
-        const desktopMaxZoom = isTabletDevice ? 32 : 10;
-        const initialZoom = 6; // Reduced zoom by 30% (from 8 to 6)
+        // Limit max zoom to 5.8 (requested)
+        const desktopMaxZoom = 5.8;
+        const initialZoom = 5.8;
         
         // #region agent log
         logData('E', 'map initialization config BEFORE creation', {
@@ -4667,6 +4690,7 @@ function initInteractiveMap() {
         
         mapInstance = L.map('map', {
             zoomControl: false,
+            zoomSnap: 0.1,
             minZoom: 5,
             maxZoom: desktopMaxZoom,
             maxBounds: [[35.5, 5.0], [48.0, 20.0]],
@@ -4682,7 +4706,7 @@ function initInteractiveMap() {
             inertiaDeceleration: 3000, // Deceleration rate for inertia
             inertiaMaxSpeed: 1500, // Max speed for inertia
             worldCopyJump: false // Prevent map from jumping when panning
-        }).setView([42.0, 12.5], initialZoom); // Zoom 6 (reduced by 30% from 8)
+        }).setView([42.0, 12.5], initialZoom);
         
         // #region agent log
         logData('E', 'map initialization config AFTER creation', {
@@ -4704,14 +4728,20 @@ function initInteractiveMap() {
         function updateMobileMapHeight() {
             const mobileContainer = document.getElementById('mobileMapWinesContainer');
             const mobileWrapper = document.getElementById('mobileMapWrapper');
+            const topNav = document.querySelector('.top-nav');
+            const searchBar = document.getElementById('mobileSearchBarContainer');
+            if (topNav && searchBar && window.innerWidth < 1024) {
+                const navH = topNav.offsetHeight;
+                const searchH = window.getComputedStyle(searchBar).display !== 'none' ? searchBar.offsetHeight : 0;
+                document.documentElement.style.setProperty('--mobile-nav-height', `${navH}px`);
+                document.documentElement.style.setProperty('--mobile-search-height', `${searchH}px`);
+            }
             if (!mobileContainer || !mobileWrapper) {
                 return;
             }
             const viewport = window.visualViewport;
             const viewportHeight = viewport ? viewport.height : window.innerHeight;
-            const topNav = document.querySelector('.top-nav');
             const wineSelector = document.querySelector('.mobile-wine-type-selector');
-            const searchBar = document.getElementById('mobileSearchBarContainer');
             let reservedHeight = 0;
             if (topNav && window.getComputedStyle(topNav).display !== 'none') {
                 reservedHeight += topNav.offsetHeight;
@@ -4719,16 +4749,17 @@ function initInteractiveMap() {
             if (wineSelector && window.getComputedStyle(wineSelector).display !== 'none') {
                 reservedHeight += wineSelector.offsetHeight;
             }
-            if (searchBar && searchBar.classList.contains('visible')) {
+            if (searchBar && (searchBar.classList.contains('visible') || window.getComputedStyle(searchBar).display !== 'none')) {
                 reservedHeight += searchBar.offsetHeight;
             }
-            const mapHeight = Math.max(320, viewportHeight - reservedHeight - 40);
-            // Aumenta l'altezza del 30%
-            const increasedMapHeight = mapHeight * 1.3;
-            mobileWrapper.style.height = `${increasedMapHeight}px`;
-            mobileWrapper.style.minHeight = `${increasedMapHeight}px`;
-            mobileWrapper.style.maxHeight = `${increasedMapHeight}px`;
-            mobileContainer.style.setProperty('--mobile-map-height', `${increasedMapHeight}px`);
+            const mapHeight = Math.max(320, viewportHeight - reservedHeight - 16);
+            mobileWrapper.style.height = '100%';
+            mobileWrapper.style.minHeight = `${mapHeight}px`;
+            mobileWrapper.style.maxHeight = 'none';
+            mobileContainer.style.setProperty('--mobile-map-height', `${mapHeight}px`);
+        }
+        if (window.innerWidth < 1024) {
+            setTimeout(updateMobileMapHeight, 0);
         }
         
         // Update mobile wines cards container height for iPhone Safari - Responsive and Dynamic
@@ -4819,6 +4850,24 @@ function initInteractiveMap() {
                 }
             }, 200 + extraDelay);
         }
+        // ResizeObserver su #map: quando il container cambia dimensione (es. riduzione larghezza),
+        // Leaflet deve ricalcolare con invalidateSize() altrimenti la mappa non si adatta
+        const mapEl = document.getElementById('map');
+        if (mapEl && typeof ResizeObserver !== 'undefined') {
+            const mapResizeObserver = new ResizeObserver(() => {
+                if (mapInstance) {
+                    mapInstance.invalidateSize();
+                    if (geoJsonLayer) {
+                        try {
+                            const b = geoJsonLayer.getBounds();
+                            if (b.isValid()) mapInstance.fitBounds(b, { paddingTopLeft: [24, 24], paddingBottomRight: [8, 24], maxZoom: 5.8, animate: false });
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            });
+            mapResizeObserver.observe(mapEl);
+        }
+
         // Enhanced responsive listeners for dynamic updates
         window.addEventListener('resize', () => scheduleViewportRefresh());
         window.addEventListener('orientationchange', () => {
@@ -4958,14 +5007,20 @@ function initInteractiveMap() {
                 // Add region labels for desktop
                 addDesktopRegionLabels(geojson);
                 
-                // Set zoom to 6 instead of using fitBounds to maintain the desired zoom level (reduced by 30%)
-                mapInstance.setZoom(6);
-                mapInstance.setView([42.0, 12.5], 6);
-                // Store original zoom and center for restoration
-                originalMapZoom = 6;
-                originalMapCenter = [42.0, 12.5];
-                
-                // Zoom is set to 6 for all devices
+                // Fit map to Italy, then force zoom 8 so user sees the requested zoom level
+                const italyBounds = geoJsonLayer.getBounds();
+                mapInstance.fitBounds(italyBounds, {
+                    paddingTopLeft: [24, 24],
+                    paddingBottomRight: [8, 24],
+                    maxZoom: 5.8,
+                    animate: false
+                });
+                // Force zoom to 5.8 (fitBounds may have chosen a lower zoom to fit Italy)
+                const center = italyBounds.getCenter();
+                mapInstance.setView([center.lat, center.lng], 5.8, { animate: false });
+                // Store actual zoom and center for "back to map" restoration
+                originalMapZoom = 5.8;
+                originalMapCenter = mapInstance.getCenter();
                 
                 // Apply initial transform to leaflet-proxy after map is loaded
                 const applyTransformToProxy = (selector, retries = 10) => {
@@ -5006,6 +5061,26 @@ function initInteractiveMap() {
                         }
                     }
                 });
+                
+                // Ensure map fills container and all regions visible after layout (full-screen map fix)
+                const isMapPage = window.location.pathname.includes('wine-map') || window.location.href.includes('wine-map');
+                if (isMapPage && mapInstance && geoJsonLayer) {
+                    const refitMap = () => {
+                        if (mapInstance && geoJsonLayer) {
+                            mapInstance.invalidateSize();
+                            const bounds = geoJsonLayer.getBounds();
+                            mapInstance.fitBounds(bounds, {
+                                paddingTopLeft: [24, 24],
+                                paddingBottomRight: [8, 24],
+                                maxZoom: 5.8,
+                                animate: false
+                            });
+                            const center = bounds.getCenter();
+                            mapInstance.setView([center.lat, center.lng], 5.8, { animate: false });
+                        }
+                    };
+                    [100, 400, 800].forEach(delay => setTimeout(refitMap, delay));
+                }
                 
                 // If URL has region parameter, select and show that region
                 if (urlRegion && geoJsonLayer) {
@@ -5786,9 +5861,9 @@ function initInteractiveMap() {
                     return;
                 }
                 try {
-                    // Set maxZoom based on device type (32 for tablets, 8 for mobile)
-                    const mobileMaxZoom = isTabletDevice ? 32 : 8;
-                    const mobileInitialZoom = 6; // Reduced zoom by 30% (from 8 to 6)
+                    // Limit max zoom to 5.8 (requested)
+                    const mobileMaxZoom = 5.8;
+                    const mobileInitialZoom = 5.8;
                     
                     // Ottimizzazioni per iPad e tablet - configurazioni pro
                     const isIPadDevice = DeviceDetector.isIPad();
@@ -5825,13 +5900,14 @@ function initInteractiveMap() {
                     
                     mobileMapInstance = L.map('mobileMap', {
                         zoomControl: false,
+                        zoomSnap: 0.1,
                         minZoom: 5,
                         maxZoom: mobileMaxZoom,
                         maxBounds: [[35.5, 5.0], [48.0, 20.0]],
                         maxBoundsViscosity: 0.5, // Reduced for smoother panning (matching desktop)
                         ...tabletConfig,
                         worldCopyJump: false // Prevent map from jumping when panning
-                    }).setView([42.0, 12.5], mobileInitialZoom); // Zoom 6 (reduced by 30%)
+                    }).setView([42.0, 12.5], mobileInitialZoom);
                     // Add tile layer with dark theme - maxZoom 32+ for tablets
                     const mobileTileMaxZoom = isTabletDevice ? 32 : 19;
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -5842,6 +5918,12 @@ function initInteractiveMap() {
                     setTimeout(() => {
                         mobileMapInstance.invalidateSize();
                     }, 100);
+                    // Second pass per iOS Safari: viewport/layout si stabilizzano in ritardo
+                    setTimeout(() => {
+                        if (mobileMapInstance) {
+                            mobileMapInstance.invalidateSize();
+                        }
+                    }, 500);
                     
                     // Load European countries borders for context (dark grey borders)
                     // Using Natural Earth simplified countries data
@@ -5957,9 +6039,17 @@ function initInteractiveMap() {
                             // Add region labels with connecting lines
                             addMobileRegionLabels(geojson);
                             
-                            // Set zoom to 6 instead of using fitBounds to maintain the desired zoom level (reduced by 30%)
-                            mobileMapInstance.setZoom(6);
-                            mobileMapInstance.setView([42.0, 12.5], 6);
+                            // Fit map to Italy, then force zoom 8 so user sees the requested zoom level
+                            const mobileItalyBounds = mobileGeoJsonLayer.getBounds();
+                            mobileMapInstance.fitBounds(mobileItalyBounds, {
+                                paddingTopLeft: [12, 70],
+                                paddingBottomRight: [24, 24],
+                                paddingBottomLeft: [12, 24],
+                                maxZoom: 5.8,
+                                animate: false
+                            });
+                            const mobileCenter = mobileItalyBounds.getCenter();
+                            mobileMapInstance.setView([mobileCenter.lat, mobileCenter.lng], 5.8, { animate: false });
                             
                             // Apply initial transform to mobile leaflet-proxy after map is loaded
                             const applyTransformToMobileProxy = (selector, retries = 10) => {
@@ -5977,6 +6067,22 @@ function initInteractiveMap() {
                             setTimeout(() => {
                                 mobileMapInstance.invalidateSize();
                             }, 200);
+                            // Ricalcola dimensioni container quando layout è stabile (evita taglio Piemonte)
+                            setTimeout(() => {
+                                if (mobileMapInstance && mobileGeoJsonLayer) {
+                                    mobileMapInstance.invalidateSize();
+                                    const b = mobileGeoJsonLayer.getBounds();
+                                    mobileMapInstance.fitBounds(b, {
+                                        paddingTopLeft: [12, 70],
+                                        paddingBottomRight: [24, 24],
+                                        paddingBottomLeft: [12, 24],
+                                        maxZoom: 5.8,
+                                        animate: false
+                                    });
+                                    const c = b.getCenter();
+                                    mobileMapInstance.setView([c.lat, c.lng], 5.8, { animate: false });
+                                }
+                            }, 800);
                             scheduleViewportRefresh();
                         })
                         .catch(error => {
@@ -6209,9 +6315,11 @@ function initInteractiveMap() {
                 const labelWidth = getLabelWidth(displayRegionName);
                 const iconSize = [labelWidth, 30];
                 
-                // Create custom icon for label
+                // 7px a destra per Valle d'Aosta, Piemonte, Liguria
+                const offsetRight = REGION_LABEL_OFFSET_RIGHT_KEYS.some(k => normalizedName.includes(k));
+                const labelClassName = 'mobile-region-label' + (offsetRight ? ' region-label-offset-right' : '');
                 const labelIcon = L.divIcon({
-                    className: 'mobile-region-label',
+                    className: labelClassName,
                     html: `<div class="mobile-region-label-text">${displayRegionName}</div>`,
                     iconSize: iconSize,
                     iconAnchor: [iconSize[0] / 2, iconSize[1] / 2]
@@ -6940,12 +7048,20 @@ function initInteractiveMap() {
         // Show Mobile Wines for Quick Search (Organic or Fancy)
         // Helper function to extract varietal name and percentage
         function parseVarietal(varietalString) {
-            // Match patterns like "Sangiovese 80%", "Sangiovese", "Merlot 20%"
+            // Match patterns like "Sangiovese 80%", "Sangiovese", "Merlot 20%", "40% Bosco"
             const match = varietalString.match(/^(.+?)(?:\s+(\d+)%)?$/);
             if (match) {
+                let name = match[1].trim();
+                let percentage = match[2] ? parseInt(match[2]) : 100;
+                // If name looks like "40% Bosco" (percentage first), extract grape and percentage
+                const leadingPct = name.match(/^(\d+)%\s*(.+)$/);
+                if (leadingPct) {
+                    percentage = parseInt(leadingPct[1]);
+                    name = leadingPct[2].trim();
+                }
                 return {
-                    name: match[1].trim(),
-                    percentage: match[2] ? parseInt(match[2]) : 100,
+                    name,
+                    percentage,
                     original: varietalString
                 };
             }
@@ -6954,6 +7070,12 @@ function initInteractiveMap() {
                 percentage: 100,
                 original: varietalString
             };
+        }
+        
+        // Returns grape name only, without leading percentage (e.g. "40% Bosco" -> "Bosco")
+        function grapeNameOnly(displayName) {
+            if (!displayName || typeof displayName !== 'string') return displayName || '';
+            return displayName.replace(/^\d+%\s*/, '').trim() || displayName;
         }
         
         // Show mobile varietals list for selection with tree structure
@@ -7130,7 +7252,7 @@ function initInteractiveMap() {
             });
         }
         
-        // Create varietal card with tree structure support
+        // Create varietal card with tree structure support (layout aligned with wine cards)
         function createVarietalCard(displayName, count, normalized, varietalData, is100Percent = false) {
             const varietalCard = document.createElement('div');
             varietalCard.className = 'mobile-wine-card-grid';
@@ -7138,15 +7260,14 @@ function initInteractiveMap() {
             varietalCard.dataset.varietalName = normalized;
             varietalCard.dataset.is100Percent = is100Percent;
             
-            const percentageText = is100Percent ? '100%' : '';
+            const nameOnly = grapeNameOnly(displayName);
+            const countText = `${count} wine${count !== 1 ? 's' : ''}`;
             varietalCard.innerHTML = `
-                <div class="mobile-wine-card-grid-single-row" style="justify-content: space-between; align-items: center;">
-                    <div>
-                        <div class="mobile-wine-card-grid-name">${displayName}${percentageText ? ` ${percentageText}` : ''}</div>
-                        <div class="mobile-wine-card-grid-producer" style="font-size: 0.9em; opacity: 0.8;">${count} wine${count !== 1 ? 's' : ''}</div>
-                    </div>
-                    <div style="color: var(--gold);">
-                        <i class="fas fa-chevron-right"></i>
+                <div class="mobile-wine-card-grid-header">
+                    <div class="mobile-wine-card-grid-name">${nameOnly}</div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                        <span class="mobile-wine-card-grid-producer" style="font-size: 0.85em; opacity: 0.9;">${countText}</span>
+                        <i class="fas fa-chevron-right" style="color: var(--gold); font-size: 0.9rem;"></i>
                     </div>
                 </div>
             `;
@@ -7225,7 +7346,7 @@ function initInteractiveMap() {
                 }
                 
                 if (winesTitle) {
-                    winesTitle.textContent = `${varietalName} ${percentage}%`;
+                    winesTitle.textContent = `${grapeNameOnly(varietalName)} ${percentage}%`;
                 }
                 
                 // Get wines with this specific percentage
@@ -7241,7 +7362,7 @@ function initInteractiveMap() {
                 winesGrid.innerHTML = '';
                 
                 if (wines.length === 0) {
-                    winesGrid.innerHTML = `<div style="color: rgba(245, 245, 240, 0.5); text-align: center; padding: 2rem;">No wines found for ${varietalName} ${percentage}%</div>`;
+                    winesGrid.innerHTML = `<div style="color: rgba(245, 245, 240, 0.5); text-align: center; padding: 2rem;">No wines found for ${grapeNameOnly(varietalName)} ${percentage}%</div>`;
                     return;
                 }
                 
@@ -7278,7 +7399,7 @@ function initInteractiveMap() {
                 }
                 
                 if (winesTitle) {
-                    winesTitle.textContent = varietalName;
+                    winesTitle.textContent = grapeNameOnly(varietalName);
                 }
                 
                 // Get wines with 100% of this varietal
@@ -7297,8 +7418,9 @@ function initInteractiveMap() {
                 if (wines100.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'mobile-wine-card-grid-subcategory-header';
+                    const grapeOnly = grapeNameOnly(varietalName);
                     header.innerHTML = `
-                        <div class="mobile-wine-card-grid-subcategory">${varietalName} 100%</div>
+                        <div class="mobile-wine-card-grid-subcategory">${grapeOnly}</div>
                         <div class="mobile-wine-card-grid-subcategory-desc">${wines100.length} wine${wines100.length !== 1 ? 's' : ''}</div>
                     `;
                     winesGrid.appendChild(header);
@@ -7330,20 +7452,20 @@ function initInteractiveMap() {
                     `;
                     winesGrid.appendChild(treeHeader);
                     
+                    const grapeOnly = grapeNameOnly(varietalName);
                     percentages.forEach(([percentage, count]) => {
                         const percentageCard = document.createElement('div');
                         percentageCard.className = 'mobile-wine-card-grid';
                         percentageCard.style.cursor = 'pointer';
                         percentageCard.dataset.varietalName = normalized;
                         percentageCard.dataset.percentage = percentage;
+                        const countText = `${percentage}% · ${count} wine${count !== 1 ? 's' : ''}`;
                         percentageCard.innerHTML = `
-                            <div class="mobile-wine-card-grid-single-row" style="justify-content: space-between; align-items: center;">
-                                <div>
-                                    <div class="mobile-wine-card-grid-name">${varietalName} ${percentage}%</div>
-                                    <div class="mobile-wine-card-grid-producer" style="font-size: 0.9em; opacity: 0.8;">${count} wine${count !== 1 ? 's' : ''}</div>
-                                </div>
-                                <div style="color: var(--gold);">
-                                    <i class="fas fa-chevron-right"></i>
+                            <div class="mobile-wine-card-grid-header">
+                                <div class="mobile-wine-card-grid-name">${grapeOnly}</div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                                    <span class="mobile-wine-card-grid-producer" style="font-size: 0.85em; opacity: 0.9;">${countText}</span>
+                                    <i class="fas fa-chevron-right" style="color: var(--gold); font-size: 0.9rem;"></i>
                                 </div>
                             </div>
                         `;
@@ -8215,12 +8337,12 @@ function initInteractiveMap() {
                     const bounds = targetLayer.getBounds();
                     
                     // Apply zoom - "quasi il doppio" means almost double zoom
-                    // Current zoom is typically 6, so we want to zoom in significantly
+                    // Current zoom is typically 5.8, so we want to zoom in significantly
                     // Using fitBounds with minimal padding to zoom in as much as possible
                     // Then optionally increase zoom level further
                     setTimeout(() => {
-                        // For tablets, use higher maxZoom (32), for others use 8
-                        const maxZoomForRegion = isTabletDevice ? 32 : 8;
+                        // Respect global max zoom limit (requested)
+                        const maxZoomForRegion = 5.8;
                         
                         // First, fit bounds with minimal padding for maximum zoom
                         mapInstance.fitBounds(bounds, { 
@@ -8229,11 +8351,8 @@ function initInteractiveMap() {
                         });
                         
                         // Then increase zoom level further (almost double)
-                        // For tablets, allow zooming up to 32, for others cap at 8
                         const currentZoom = mapInstance.getZoom();
-                        const targetZoom = isTabletDevice 
-                            ? Math.min(32, currentZoom * 1.8) // For tablets, allow up to 32
-                            : Math.min(8, currentZoom * 1.8); // For others, cap at 8
+                        const targetZoom = Math.min(maxZoomForRegion, currentZoom * 1.8);
                         
                         if (targetZoom > currentZoom) {
                             mapInstance.setZoom(targetZoom, {
@@ -9786,30 +9905,12 @@ function initInteractiveMap() {
                     if (dropdown) dropdown.style.display = 'none';
                 }
                 
-                // Perform search after user stops typing (debounce)
+                // Perform search after user stops typing (debounce) – delay allows finishing typing
                 searchTimeout = setTimeout(() => {
                     if (searchTerm.length >= 2) {
                         waitForWineApp(() => {
-                            if (isMobile) {
-                                // Check if search term matches an exact producer name
-                                const exactProducer = findExactProducerMatch(searchTerm);
-                                if (exactProducer) {
-                                    // Show producer wines view (same as clicking producer in autocomplete)
-                                    showMobileProducerPopup(exactProducer);
-                                    return;
-                                }
-                                
-                                // Check if search term matches an exact region name
-                                const exactRegion = findExactRegionMatch(searchTerm);
-                                if (exactRegion) {
-                                    // Show region wines view (same as clicking region on map)
-                                    const mobileSearchInput = document.getElementById('mobileSearchInput');
-                                    const currentSearchTerm = mobileSearchInput ? mobileSearchInput.value.trim() : '';
-                                    showMobileWinesForRegion(exactRegion, null, currentSearchTerm);
-                                    return;
-                                }
-                            }
-                            
+                            // Only show search results list here; producer/region views are opened
+                            // when user selects a suggestion (click or Enter), not automatically
                             const results = performGlobalSearch(searchTerm);
                             if (isMobile) {
                                 displayMobileSearchResults(searchTerm, results);
@@ -9818,7 +9919,7 @@ function initInteractiveMap() {
                             }
                         });
                     }
-                }, 300);
+                }, 1300);
             });
             
             // Keyboard navigation for autocomplete
@@ -9942,9 +10043,10 @@ function initInteractiveMap() {
                     });
                 }
                 
-                // Get all wines from this producer
+                // Get all wines from this producer (case-insensitive to handle data inconsistencies)
+                const producerNameNorm = (producerName || '').trim().toLowerCase();
                 const producerWines = window.wineApp.wines.filter(wine => {
-                    return wine.wine_producer && wine.wine_producer.trim() === producerName.trim();
+                    return wine.wine_producer && wine.wine_producer.trim().toLowerCase() === producerNameNorm;
                 });
                 
                 // Extract unique wine types present for this producer
@@ -10115,9 +10217,80 @@ function initInteractiveMap() {
         function displayMobileSearchResults(searchTerm, results) {
             const mobileWinesContainer = document.getElementById('mobileWinesContainer');
             const mobileWinesCards = document.getElementById('mobileWinesCards');
-            
+            const mapView = document.getElementById('mobileMapView');
+            const winesContainer = document.getElementById('mobileWinesCardsContainer');
+            const winesGrid = document.getElementById('mobileWinesCardsGrid');
+            const winesTitle = document.getElementById('mobileWinesCardsTitle');
+            const typeFiltersContainer = document.getElementById('mobileWinesCardsTypeFilters');
+            const backBtn = document.getElementById('mobileBackToMapBtn');
+            const isMapPage = !!(mapView && winesContainer && winesGrid);
+
+            if (isMapPage) {
+                // Wine-map page: use map-style layout (hide map, show wines container)
+                mapView.style.display = 'none';
+                winesContainer.style.display = 'flex';
+                const mapWinesContainer = document.getElementById('mobileMapWinesContainer');
+                if (mapWinesContainer) {
+                    mapWinesContainer.classList.add('wines-cards-expanded');
+                }
+                setTimeout(() => updateMobileWinesCardsHeight(), 100);
+
+                if (winesTitle) {
+                    winesTitle.textContent = results.length > 0 ? `Search: "${searchTerm}"` : 'Search';
+                }
+                if (typeFiltersContainer) {
+                    typeFiltersContainer.innerHTML = '';
+                    typeFiltersContainer.style.display = 'none';
+                }
+
+                if (backBtn) {
+                    const newBackBtn = backBtn.cloneNode(true);
+                    backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+                    newBackBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (mapWinesContainer) {
+                            mapWinesContainer.classList.remove('wines-cards-expanded');
+                        }
+                        winesContainer.style.height = '';
+                        winesContainer.style.maxHeight = '';
+                        winesContainer.style.minHeight = '';
+                        mapView.style.display = 'flex';
+                        winesContainer.style.display = 'none';
+                        const searchInput = document.getElementById('mobileSearchInput');
+                        if (searchInput) searchInput.value = '';
+                        setTimeout(() => updateMobileMapHeight(), 100);
+                    });
+                }
+
+                winesGrid.innerHTML = '';
+                if (results.length === 0) {
+                    winesGrid.innerHTML = `
+                        <div style="color: rgba(245, 245, 240, 0.5); text-align: center; padding: 3rem 1.5rem;">
+                            <i class="fas fa-search" style="font-size: 2.5rem; color: var(--gold); opacity: 0.3; margin-bottom: 1rem; display: block;"></i>
+                            <p style="font-size: 1rem; margin: 0;">No wines found matching "${searchTerm}"</p>
+                            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Try searching by wine name, producer, varietal, or region</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const groupedWines = typeof groupWinesBySubcategory === 'function' ? groupWinesBySubcategory(results) : [{ subcategoryInfo: null, wines: results }];
+                if (typeof renderGroupedWinesAsTable === 'function') {
+                    renderGroupedWinesAsTable(groupedWines, winesGrid);
+                } else {
+                    winesGrid.innerHTML = results.map(wine => {
+                        const price = wine.wine_price || wine.wine_price_bottle || wine.wine_price_glass || 'N/A';
+                        const producer = wine.wine_producer || 'Unknown';
+                        return `<div class="mobile-wine-card" data-wine-id="${wine.wine_number}" onclick="window.location.href='wine-details.html?id=${wine.wine_number}&from=search'"><div class="mobile-wine-card-header"><h3 class="mobile-wine-card-name">${(wine.wine_name || 'Unknown Wine').replace(/</g, '&lt;')} <span class="mobile-wine-card-producer-inline">- ${(producer || '').replace(/</g, '&lt;')}</span></h3><span class="mobile-wine-card-price">$${price}</span></div><div class="mobile-wine-card-info"><p class="mobile-wine-card-region"><strong>Region:</strong> ${(wine.region || 'N/A').replace(/</g, '&lt;')}</p><p class="mobile-wine-card-varietal"><strong>Varietal:</strong> ${(wine.varietals || 'N/A').replace(/</g, '&lt;')}</p></div></div>`;
+                    }).join('');
+                }
+                return;
+            }
+
+            // Other pages (e.g. index): use mobileWinesCards if present
             if (!mobileWinesCards) return;
-            
+
             if (results.length === 0) {
                 mobileWinesCards.innerHTML = `
                     <div style="color: rgba(245, 245, 240, 0.5); text-align: center; padding: 3rem 1.5rem;">
@@ -10131,17 +10304,17 @@ function initInteractiveMap() {
                 }
                 return;
             }
-            
+
             // Display results as cards
             mobileWinesCards.innerHTML = results.map(wine => {
                 const price = wine.wine_price || wine.wine_price_bottle || wine.wine_price_glass || 'N/A';
                 const producer = wine.wine_producer || 'Unknown';
                 const subcategory = wine.subcategory || '';
-                const subcategoryInfo = formatSubcategoryForDisplay(subcategory, wine);
+                const subcategoryInfo = typeof formatSubcategoryForDisplay === 'function' ? formatSubcategoryForDisplay(subcategory, wine) : null;
                 return `
                     <div class="mobile-wine-card" data-wine-id="${wine.wine_number}" onclick="window.location.href='wine-details.html?id=${wine.wine_number}&from=search'">
                         <div class="mobile-wine-card-header">
-                            <h3 class="mobile-wine-card-name">${wine.wine_name || 'Unknown Wine'} <span class="mobile-wine-card-producer-inline">- ${producer}</span></h3>
+                            <h3 class="mobile-wine-card-name">${(wine.wine_name || 'Unknown Wine').replace(/</g, '&lt;')} <span class="mobile-wine-card-producer-inline">- ${(producer || '').replace(/</g, '&lt;')}</span></h3>
                             <span class="mobile-wine-card-price">$${price}</span>
                         </div>
                         <div class="mobile-wine-card-info">
@@ -10151,13 +10324,13 @@ function initInteractiveMap() {
                                     ${subcategoryInfo.description ? `<div class="mobile-wine-card-subcategory-desc">${subcategoryInfo.description}</div>` : ''}
                                 </div>
                             ` : ''}
-                            <p class="mobile-wine-card-region"><strong>Region:</strong> ${wine.region || 'N/A'}</p>
-                            <p class="mobile-wine-card-varietal"><strong>Varietal:</strong> ${wine.varietals || 'N/A'}</p>
+                            <p class="mobile-wine-card-region"><strong>Region:</strong> ${(wine.region || 'N/A').replace(/</g, '&lt;')}</p>
+                            <p class="mobile-wine-card-varietal"><strong>Varietal:</strong> ${(wine.varietals || 'N/A').replace(/</g, '&lt;')}</p>
                         </div>
                     </div>
                 `;
             }).join('');
-            
+
             if (mobileWinesContainer) {
                 mobileWinesContainer.style.display = 'block';
             }

@@ -89,10 +89,9 @@
             transform: translateY(0);
         }
         
-        /* Bottom region buttons */
+        /* Region buttons below map (not overlay) */
         #region-buttons { 
-            position: absolute; 
-            bottom: 0; 
+            flex-shrink: 0;
             width: 100%; 
             display: flex; 
             justify-content: space-around; 
@@ -101,7 +100,6 @@
             padding: 12px 8px;
             box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.6);
             border-top: 1px solid rgba(212, 175, 55, 0.3);
-            z-index: 1000;
             backdrop-filter: blur(10px);
             flex-wrap: wrap;
             gap: 8px;
@@ -134,28 +132,42 @@
             transform: translateY(0);
         }
         
-        /* Adjust map container to account for bottom buttons */
+        /* Map container: full width and height below header (responsive) */
         .map-wrapper {
             position: relative;
             flex: 1;
             min-height: 0;
             display: flex;
             flex-direction: column;
+            width: 100%;
+            overflow: hidden;
+            padding: 0;
         }
         
+        /* Map fills entire wrapper - full viewport area below header */
         #map {
             position: absolute;
-            top: -30px;
-            bottom: 60px;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        /* SVG (Leaflet-generated Italy map): responsive, scale to viewport */
+        #map svg,
+        #mobileMap svg,
+        .map-wrapper svg,
+        .mobile-map-wrapper svg {
+            max-width: 100%;
+            display: block;
+            margin: 0 auto;
         }
         
         /* Tablet-specific styles */
         @media (min-width: 768px) and (max-width: 1024px) {
-            #map {
-                bottom: 60px;
-            }
-            
             #floating-controls {
                 top: 10px;
                 min-width: 320px;
@@ -174,8 +186,31 @@
         
         /* Mobile styles */
         @media (max-width: 767px) {
-            #map {
-                bottom: 60px;
+            /* Padding ridotto per mappa più larga (evita taglio Piemonte), responsive + safe area */
+            .mobile-map-view {
+                padding-left: max(clamp(0.25rem, 2vw, 0.5rem), env(safe-area-inset-left, 0));
+                padding-right: max(clamp(0.25rem, 2vw, 0.5rem), env(safe-area-inset-right, 0));
+            }
+            /* Container: full width; allow vertical scroll if map taller than viewport (portrait) */
+            .mobile-map-wrapper {
+                width: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Desktop map wrapper (when visible on tablet) also scrollable on small screens */
+            .map-wrapper {
+                width: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Map fills width; min-height so user can scroll to see full Italy */
+            #map,
+            #mobileMap {
+                min-height: 100%;
             }
             
             #floating-controls {
@@ -208,6 +243,15 @@
             }
         }
         
+        /* Portrait: ensure map area can scroll so entire Italy is visible */
+        @media (max-width: 767px) and (orientation: portrait) {
+            .map-wrapper,
+            .mobile-map-wrapper {
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+        }
+        
         /* Desktop - hide floating controls if search bar exists */
         @media (min-width: 1024px) {
             #floating-controls {
@@ -217,6 +261,22 @@
             #region-buttons {
                 display: none; /* Hide on desktop - use sidebar instead */
             }
+        }
+        
+        /* Map page: main content column fills viewport below header so map can extend full width/height */
+        body .main-content-desktop {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            width: 100% !important;
+        }
+        
+        body .main-content-desktop .map-wrapper {
+            flex: 1 !important;
+            min-height: 0 !important;
+            width: 100% !important;
         }
     </style>
 </head>
@@ -370,25 +430,6 @@
                         <div class="autocomplete-suggestions" id="mobileAutocompleteSuggestions"></div>
                     </div>
                 </div>
-                <!-- Quick Search Buttons -->
-                <div class="mobile-quick-search-buttons">
-                    <button class="mobile-quick-search-btn" id="mobileDynamicModeBtn">
-                        <span>Dynamic Mode</span>
-                    </button>
-                    <button class="mobile-quick-search-btn" id="mobileQuickSearchOrganic" data-filter="organic">
-                        <span>Organic</span>
-                    </button>
-                    <button class="mobile-quick-search-btn" id="mobileQuickSearchFancy" data-filter="fancy">
-                        <span>Feeling Fancy</span>
-                    </button>
-                    <button class="mobile-quick-search-btn" id="mobileQuickSearchVarietals" data-filter="varietals">
-                        <span>Varietals</span>
-                    </button>
-                    <button class="mobile-quick-search-btn compare-wines-btn" id="mobileCompareWinesBtn" onclick="window.location.href='wine-comparison.html'" style="display: none;">
-                        <i class="fas fa-balance-scale"></i>
-                        <span>Compare Wines</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -439,6 +480,27 @@
                             <p id="mobileRegionWineFacts" class="mobile-region-wine-facts">-</p>
                         </div>
                         
+                    </div>
+                    <!-- Quick Search Buttons (below map) -->
+                    <div class="mobile-quick-search-below-map">
+                        <div class="mobile-quick-search-buttons">
+                            <button class="mobile-quick-search-btn" id="mobileDynamicModeBtn">
+                                <span>Dynamic Mode</span>
+                            </button>
+                            <button class="mobile-quick-search-btn" id="mobileQuickSearchOrganic" data-filter="organic">
+                                <span>Organic</span>
+                            </button>
+                            <button class="mobile-quick-search-btn" id="mobileQuickSearchFancy" data-filter="fancy">
+                                <span>Feeling Fancy</span>
+                            </button>
+                            <button class="mobile-quick-search-btn" id="mobileQuickSearchVarietals" data-filter="varietals">
+                                <span>Varietals</span>
+                            </button>
+                            <button class="mobile-quick-search-btn compare-wines-btn" id="mobileCompareWinesBtn" onclick="window.location.href='wine-comparison.html'" style="display: none;">
+                                <i class="fas fa-balance-scale"></i>
+                                <span>Compare Wines</span>
+                            </button>
+                        </div>
                     </div>
                     <!-- Mobile Wine Type Selector (positioned below map) -->
                     <div class="mobile-wine-type-selector" id="mobileWineTypeSelector" style="display: none;">
@@ -595,7 +657,7 @@
             </aside>
 
             <!-- Main Content -->
-            <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0;" class="main-content-desktop">
+            <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; min-width: 0;" class="main-content-desktop">
                 <!-- Search Bar -->
                 <div class="search-bar-container">
                     <div class="search-wrapper">
@@ -612,7 +674,7 @@
                     </div>
                 </div>
                     
-                <!-- Map Container -->
+                <!-- Map Container: width 100%, overflow hidden. Italy map is drawn by Leaflet (GeoJSON) inside #map; the visible bounds (effective viewBox) are set via fitBounds() in main.js so all regions scale to the viewport. -->
                 <div class="map-wrapper" id="mapWrapper">
                     <!-- Floating search bar with small buttons (mobile/tablet only) -->
                     <div id="floating-controls">
@@ -625,19 +687,6 @@
                     </div>
                     
                     <div id="map"></div>
-                    
-                    <!-- Bottom region buttons (mobile/tablet only) -->
-                    <div id="region-buttons">
-                        <button class="region-button" onclick="goToRegion('Lazio')">Lazio</button>
-                        <button class="region-button" onclick="goToRegion('Toscana')">Toscana</button>
-                        <button class="region-button" onclick="goToRegion('Umbria')">Umbria</button>
-                        <button class="region-button" onclick="goToRegion('Marche')">Marche</button>
-                        <button class="region-button" onclick="goToRegion('Abruzzo')">Abruzzo</button>
-                        <button class="region-button" onclick="goToRegion('Molise')">Molise</button>
-                        <button class="region-button" onclick="goToRegion('Lombardia')">Lombardia</button>
-                        <button class="region-button" onclick="goToRegion('Veneto')">Veneto</button>
-                        <button class="region-button" onclick="goToRegion('Piemonte')">Piemonte</button>
-                    </div>
                     <div class="region-info" id="regionInfo">
                         <button class="region-info-close" id="regionInfoClose" aria-label="Close region info">
                             <i class="fas fa-times"></i>
@@ -658,6 +707,19 @@
                         <i class="fas fa-book-open"></i>
                         <span class="sparkling-guide-text">Sparkling Guide</span>
                     </a>
+                </div>
+                
+                <!-- Region buttons below map (mobile/tablet only) -->
+                <div id="region-buttons">
+                    <button class="region-button" onclick="goToRegion('Lazio')">Lazio</button>
+                    <button class="region-button" onclick="goToRegion('Toscana')">Toscana</button>
+                    <button class="region-button" onclick="goToRegion('Umbria')">Umbria</button>
+                    <button class="region-button" onclick="goToRegion('Marche')">Marche</button>
+                    <button class="region-button" onclick="goToRegion('Abruzzo')">Abruzzo</button>
+                    <button class="region-button" onclick="goToRegion('Molise')">Molise</button>
+                    <button class="region-button" onclick="goToRegion('Lombardia')">Lombardia</button>
+                    <button class="region-button" onclick="goToRegion('Veneto')">Veneto</button>
+                    <button class="region-button" onclick="goToRegion('Piemonte')">Piemonte</button>
                 </div>
                 
                 <!-- Wines List Container (replaces map when region is clicked) -->
@@ -760,10 +822,10 @@
         function handleReset() {
             // Reset map view
             if (window.mapInstance) {
-                window.mapInstance.setView([42.0, 12.5], 6);
+                window.mapInstance.setView([42.0, 12.5], 5.8);
             }
             if (window.mobileMapInstance) {
-                window.mobileMapInstance.setView([42.0, 12.5], 6);
+                window.mobileMapInstance.setView([42.0, 12.5], 5.8);
             }
             
             // Clear search

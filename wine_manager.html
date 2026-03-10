@@ -375,6 +375,81 @@
             transform: scale(1.1);
             background: linear-gradient(135deg, rgba(212, 175, 55, 1) 0%, rgba(184, 134, 11, 1) 100%);
         }
+
+        /* Modal Add/Edit Wine */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-wine {
+            background: white;
+            border-radius: 12px;
+            max-width: 640px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-wine h3 {
+            padding: 20px 24px;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        .modal-wine .modal-body { padding: 24px; }
+        .modal-wine .form-group { margin-bottom: 16px; }
+        .modal-wine label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .modal-wine input, .modal-wine textarea, .modal-wine select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .modal-wine input:focus, .modal-wine textarea:focus, .modal-wine select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .modal-wine textarea { min-height: 60px; resize: vertical; }
+        .modal-wine .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .modal-wine .form-row .form-group { flex: 1; min-width: 140px; }
+        .modal-wine .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-add-wine {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-add-wine:hover { background: #218838; transform: translateY(-2px); }
     </style>
 </head>
 <body>
@@ -400,6 +475,7 @@
             <select class="region-filter" id="regionFilter">
                 <option value="">Tutte le regioni</option>
             </select>
+            <button class="btn btn-add-wine" onclick="openEditModal(null)"><i class="fas fa-plus"></i> Aggiungi vino</button>
             <button class="btn btn-secondary" onclick="toggleView()" id="toggleViewBtn">Vista Regioni</button>
             <button class="btn btn-primary" onclick="downloadUpdatedJSON()">Scarica wines.json</button>
             <button class="btn btn-save-local" onclick="saveToLocalFile()">💾 Salva in locale</button>
@@ -415,6 +491,10 @@
             <div class="stat-box">
                 <h3 id="updatedLinks">0</h3>
                 <p>Link Modificati</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="modificationsCount">0</h3>
+                <p>Modifiche (add/edit/rimuovi)</p>
             </div>
         </div>
 
@@ -464,12 +544,127 @@
             <tbody id="wineTableBody">
             </tbody>
         </table>
+
+        <!-- Modal Add/Edit Wine -->
+        <div id="wineModal" class="modal-overlay" onclick="if(event.target===this)closeEditModal()">
+            <div class="modal-wine" onclick="event.stopPropagation()">
+                <h3 id="modalTitle">Modifica vino</h3>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Numero vino *</label>
+                            <input type="text" id="m_wine_number" placeholder="es. 397" required>
+                        </div>
+                        <div class="form-group" style="flex:2">
+                            <label>Nome vino *</label>
+                            <input type="text" id="m_wine_name" placeholder="es. FRANCIACORTA AMINANTE" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Produttore *</label>
+                            <input type="text" id="m_wine_producer" placeholder="es. BARONE PIZZINI" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Annata / Vintage</label>
+                            <input type="text" id="m_wine_vintage" placeholder="es. (FRANCIACORTA DOCG)">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Prezzo</label>
+                            <input type="text" id="m_wine_price" placeholder="es. 115">
+                        </div>
+                        <div class="form-group">
+                            <label>Prezzo bicchiere</label>
+                            <input type="text" id="m_wine_price_glass" placeholder="es. 15.9">
+                        </div>
+                        <div class="form-group">
+                            <label>Prezzo bottiglia</label>
+                            <input type="text" id="m_wine_price_bottle" placeholder="es. 115">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Regione *</label>
+                            <input type="text" id="m_region" placeholder="es. LOMBARDIA" list="regionsList">
+                            <datalist id="regionsList"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo vino</label>
+                            <input type="text" id="m_wine_type" placeholder="es. BOLLICINE (METODO CLASSICO)">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Categoria</label>
+                            <input type="text" id="m_category" placeholder="es. VINI BIANCHI E ROSATI">
+                        </div>
+                        <div class="form-group">
+                            <label>Sottocategoria</label>
+                            <input type="text" id="m_subcategory" placeholder="es. METODO CLASSICO">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descrizione</label>
+                        <textarea id="m_wine_description" placeholder="Breve descrizione del vino"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>URL immagine bottiglia</label>
+                        <input type="url" id="m_bottle_image_url" placeholder="https://...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Varietali</label>
+                            <input type="text" id="m_varietals" placeholder="es. Chardonnay, Pinot Nero">
+                        </div>
+                        <div class="form-group">
+                            <label>Aging</label>
+                            <input type="text" id="m_aging" placeholder="es. On the lees (Metodo Classico)">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Body</label>
+                            <input type="text" id="m_body" placeholder="es. Light-Medium">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:center;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="m_organic" style="width:auto;">
+                                Biologico
+                            </label>
+                        </div>
+                    </div>
+                    <hr style="margin:20px 0;">
+                    <strong>Tasting Notes</strong>
+                    <div class="form-group">
+                        <label>Visivo</label>
+                        <textarea id="m_tasting_visual" placeholder="Colore, perlage..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Olfattivo</label>
+                        <textarea id="m_tasting_olfactory" placeholder="Aromi..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Gustativo</label>
+                        <textarea id="m_tasting_gustatory" placeholder="Sapore, finale..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeEditModal()">Annulla</button>
+                    <button class="btn btn-primary" onclick="saveWineFromModal()">Salva</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let winesData = [];
         let jsonData = { wines: [] };
         let updatedLinks = new Set();
+        let modificationCount = 0;  // add/edit/remove
+
+        const VALID_REGIONS = ['SICILIA','PIEMONTE','TOSCANA','VENETO','LOMBARDIA','EMILIA-ROMAGNA','LAZIO','CAMPANIA','PUGLIA','CALABRIA','BASILICATA','MOLISE','ABRUZZO','UMBRIA','LE MARCHE','FRIULI-VENEZIA GIULIA','FRIULI','TRENTINO ALTO-ADIGE','VALLE D\'AOSTA','LIGURIA','SARDEGNA'];
 
         // Carica CSV
         document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -545,33 +740,51 @@
         }
 
         function mergeData() {
-            if (winesData.length === 0 || !jsonData.wines || jsonData.wines.length === 0) {
-                return;
+            let mergedWines = [];
+
+            if (winesData.length > 0 && jsonData.wines && jsonData.wines.length > 0) {
+                // Modalità CSV + JSON: combina i dati
+                const jsonWinesMap = {};
+                jsonData.wines.forEach(wine => {
+                    jsonWinesMap[wine.wine_number] = wine;
+                });
+                mergedWines = winesData.map(csvWine => {
+                    const jsonWine = jsonWinesMap[csvWine.wineNumber] || {};
+                    return {
+                        wineNumber: csvWine.wineNumber,
+                        wineName: csvWine.wineName,
+                        link: csvWine.link,
+                        producer: jsonWine.wine_producer || 'N/A',
+                        region: jsonWine.region || 'N/A',
+                        jsonWine: jsonWine
+                    };
+                });
+            } else if (jsonData.wines && jsonData.wines.length > 0) {
+                // Modalità JSON-only: costruisci da wines.json
+                mergedWines = jsonData.wines.map(w => ({
+                    wineNumber: w.wine_number,
+                    wineName: w.wine_name || 'N/A',
+                    link: w.bottle_image_url || '',
+                    producer: w.wine_producer || 'N/A',
+                    region: w.region || 'N/A',
+                    jsonWine: w
+                }));
             }
 
-            // Crea una mappa dei vini dal JSON per accesso rapido
-            const jsonWinesMap = {};
-            jsonData.wines.forEach(wine => {
-                jsonWinesMap[wine.wine_number] = wine;
-            });
-
-            // Combina i dati
-            const mergedWines = winesData.map(csvWine => {
-                const jsonWine = jsonWinesMap[csvWine.wineNumber] || {};
-                return {
-                    wineNumber: csvWine.wineNumber,
-                    wineName: csvWine.wineName,
-                    link: csvWine.link,
-                    producer: jsonWine.wine_producer || 'N/A',
-                    region: jsonWine.region || 'N/A',
-                    jsonWine: jsonWine
-                };
-            });
+            if (mergedWines.length === 0) return;
 
             populateRegionFilter(mergedWines);
+            populateRegionsDatalist();
             displayWines(mergedWines);
             displayWinesByRegion(mergedWines);
             updateStats(mergedWines.length);
+        }
+
+        function populateRegionsDatalist() {
+            const regions = [...new Set(jsonData.wines.map(w => w.region).filter(Boolean))].sort();
+            const dl = document.getElementById('regionsList');
+            if (!dl) return;
+            dl.innerHTML = regions.map(r => `<option value="${r}">`).join('');
         }
 
         function populateRegionFilter(wines) {
@@ -587,13 +800,11 @@
                 option.textContent = region;
                 regionFilter.appendChild(option);
             });
-
-            // Aggiungi listener per il filtro
-            regionFilter.addEventListener('change', function() {
-                const selectedRegion = this.value;
-                filterByRegion(selectedRegion);
-            });
         }
+
+        document.getElementById('regionFilter').addEventListener('change', function() {
+            filterByRegion(this.value);
+        });
 
         function filterByRegion(region) {
             const rows = document.querySelectorAll('#wineTableBody tr, .region-section');
@@ -646,14 +857,10 @@
                     </td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn btn-small btn-highlight" 
-                                    onclick="highlightRow('${wine.wineNumber}')">
-                                Evidenzia
-                            </button>
-                            <button class="btn btn-small btn-update" 
-                                    onclick="updateLink('${wine.wineNumber}')">
-                                Aggiorna
-                            </button>
+                            <button class="btn btn-small btn-highlight" onclick="highlightRow('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Evidenzia</button>
+                            <button class="btn btn-small btn-update" onclick="updateLink('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Aggiorna</button>
+                            <button class="btn btn-small btn-update" onclick="openEditModal('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Modifica</button>
+                            <button class="btn btn-small btn-danger" onclick="removeWine('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Rimuovi</button>
                         </div>
                     </td>
                 `;
@@ -730,6 +937,170 @@
             alert(`Link aggiornato per il vino ${wineNumber}`);
         }
 
+        function getDefaultWine() {
+            return {
+                wine_number: "",
+                wine_name: "",
+                wine_producer: "",
+                wine_vintage: null,
+                wine_price: "",
+                wine_price_split: null,
+                wine_price_glass: null,
+                wine_price_bottle: null,
+                wine_description: "",
+                region: "",
+                wine_type: "",
+                category: "",
+                organic: false,
+                alcohol: null,
+                aging: null,
+                varietals: null,
+                soil: null,
+                elevation: null,
+                bottle_image_url: "",
+                subcategory: null,
+                tasting_notes: { visual: "", olfactory: "", gustatory: "" },
+                body: null
+            };
+        }
+
+        function openEditModal(wineNumber) {
+            const modal = document.getElementById('wineModal');
+            const title = document.getElementById('modalTitle');
+            const isNew = wineNumber === null || wineNumber === '';
+            title.textContent = isNew ? 'Aggiungi vino' : 'Modifica vino';
+
+            let w;
+            if (isNew) {
+                w = getDefaultWine();
+            } else {
+                const found = jsonData.wines.find(x => x.wine_number === wineNumber);
+                if (!found) { alert('Vino non trovato'); return; }
+                w = JSON.parse(JSON.stringify(found));
+            }
+
+            document.getElementById('m_wine_number').value = w.wine_number || '';
+            document.getElementById('m_wine_name').value = w.wine_name || '';
+            document.getElementById('m_wine_producer').value = w.wine_producer || '';
+            document.getElementById('m_wine_vintage').value = w.wine_vintage || '';
+            document.getElementById('m_wine_price').value = w.wine_price || '';
+            document.getElementById('m_wine_price_glass').value = w.wine_price_glass || '';
+            document.getElementById('m_wine_price_bottle').value = w.wine_price_bottle || '';
+            document.getElementById('m_region').value = w.region || '';
+            document.getElementById('m_wine_type').value = w.wine_type || '';
+            document.getElementById('m_category').value = w.category || '';
+            document.getElementById('m_subcategory').value = w.subcategory || '';
+            document.getElementById('m_wine_description').value = w.wine_description || '';
+            document.getElementById('m_bottle_image_url').value = w.bottle_image_url || '';
+            document.getElementById('m_varietals').value = w.varietals || '';
+            document.getElementById('m_aging').value = w.aging || '';
+            document.getElementById('m_body').value = w.body || '';
+            document.getElementById('m_organic').checked = !!w.organic;
+            const tn = w.tasting_notes || {};
+            document.getElementById('m_tasting_visual').value = tn.visual || '';
+            document.getElementById('m_tasting_olfactory').value = tn.olfactory || '';
+            document.getElementById('m_tasting_gustatory').value = tn.gustatory || '';
+
+            document.getElementById('m_wine_number').disabled = !isNew;
+            modal.dataset.editingWineNumber = isNew ? '' : wineNumber;
+            modal.classList.add('open');
+        }
+
+        function closeEditModal() {
+            document.getElementById('wineModal').classList.remove('open');
+        }
+
+        function saveWineFromModal() {
+            const num = document.getElementById('m_wine_number').value.trim();
+            const name = document.getElementById('m_wine_name').value.trim();
+            const producer = document.getElementById('m_wine_producer').value.trim();
+            const region = document.getElementById('m_region').value.trim();
+            if (!num || !name || !producer || !region) {
+                alert('Compila i campi obbligatori: Numero, Nome, Produttore, Regione');
+                return;
+            }
+
+            const editingNum = document.getElementById('wineModal').dataset.editingWineNumber;
+            const isNew = !editingNum;
+
+            const wine = {
+                wine_number: num,
+                wine_name: name,
+                wine_producer: producer,
+                wine_vintage: document.getElementById('m_wine_vintage').value.trim() || null,
+                wine_price: document.getElementById('m_wine_price').value.trim() || '',
+                wine_price_split: null,
+                wine_price_glass: document.getElementById('m_wine_price_glass').value.trim() || null,
+                wine_price_bottle: document.getElementById('m_wine_price_bottle').value.trim() || null,
+                wine_description: document.getElementById('m_wine_description').value.trim() || '',
+                region: region,
+                wine_type: document.getElementById('m_wine_type').value.trim() || '',
+                category: document.getElementById('m_category').value.trim() || '',
+                organic: document.getElementById('m_organic').checked,
+                alcohol: null,
+                aging: document.getElementById('m_aging').value.trim() || null,
+                varietals: document.getElementById('m_varietals').value.trim() || null,
+                soil: null,
+                elevation: null,
+                bottle_image_url: document.getElementById('m_bottle_image_url').value.trim() || '',
+                subcategory: document.getElementById('m_subcategory').value.trim() || null,
+                tasting_notes: {
+                    visual: document.getElementById('m_tasting_visual').value.trim() || '',
+                    olfactory: document.getElementById('m_tasting_olfactory').value.trim() || '',
+                    gustatory: document.getElementById('m_tasting_gustatory').value.trim() || ''
+                },
+                body: document.getElementById('m_body').value.trim() || null
+            };
+
+            if (isNew) {
+                if (jsonData.wines.some(w => w.wine_number === num)) {
+                    alert('Esiste già un vino con questo numero');
+                    return;
+                }
+                jsonData.wines.push(wine);
+                modificationCount++;
+            } else {
+                const idx = jsonData.wines.findIndex(w => w.wine_number === editingNum);
+                if (idx < 0) { alert('Vino non trovato'); return; }
+                if (editingNum !== num && jsonData.wines.some(w => w.wine_number === num)) {
+                    alert('Esiste già un vino con questo numero');
+                    return;
+                }
+                jsonData.wines[idx] = wine;
+                if (editingNum !== num) {
+                    updatedLinks.delete(editingNum);
+                    if (winesData.length > 0) {
+                        const csvIdx = winesData.findIndex(w => w.wineNumber === editingNum);
+                        if (csvIdx >= 0) winesData[csvIdx].wineNumber = num;
+                    }
+                }
+                modificationCount++;
+            }
+
+            saveToLocalStorage();
+            closeEditModal();
+            mergeData();
+            updateStats();
+            alert(isNew ? 'Vino aggiunto' : 'Vino aggiornato');
+        }
+
+        function removeWine(wineNumber) {
+            if (!confirm(`Rimuovere il vino ${wineNumber}?`)) return;
+            const idx = jsonData.wines.findIndex(w => w.wine_number === wineNumber);
+            if (idx < 0) { alert('Vino non trovato'); return; }
+            jsonData.wines.splice(idx, 1);
+            updatedLinks.delete(wineNumber);
+            if (winesData.length > 0) {
+                const csvIdx = winesData.findIndex(w => w.wineNumber === wineNumber);
+                if (csvIdx >= 0) winesData.splice(csvIdx, 1);
+            }
+            modificationCount++;
+            saveToLocalStorage();
+            mergeData();
+            updateStats();
+            alert('Vino rimosso');
+        }
+
         function filterWines(searchTerm) {
             const rows = document.querySelectorAll('#wineTableBody tr');
             rows.forEach(row => {
@@ -743,21 +1114,25 @@
         }
 
         function updateStats(total = null) {
+            const stats = document.getElementById('stats');
+            if (!stats) return;
             if (total !== null) {
-                document.getElementById('totalWines').textContent = total;
+                const el = document.getElementById('totalWines');
+                if (el) el.textContent = total;
             }
-            document.getElementById('updatedLinks').textContent = updatedLinks.size;
-            document.getElementById('stats').style.display = 'flex';
+            const ul = document.getElementById('updatedLinks');
+            if (ul) ul.textContent = updatedLinks.size;
+            const mc = document.getElementById('modificationsCount');
+            if (mc) mc.textContent = modificationCount;
+            stats.style.display = 'flex';
         }
 
         function saveToLocalStorage() {
             try {
-                // Salva i dati JSON modificati
                 localStorage.setItem('wineManager_jsonData', JSON.stringify(jsonData));
-                // Salva i dati CSV modificati
                 localStorage.setItem('wineManager_winesData', JSON.stringify(winesData));
-                // Salva la lista dei link modificati
                 localStorage.setItem('wineManager_updatedLinks', JSON.stringify(Array.from(updatedLinks)));
+                localStorage.setItem('wineManager_modificationCount', String(modificationCount));
                 console.log('Modifiche salvate in localStorage');
             } catch (e) {
                 console.warn('Errore nel salvataggio localStorage:', e);
@@ -785,8 +1160,11 @@
                     console.log(`Caricati ${updatedLinks.size} link modificati da localStorage`);
                 }
 
+                const savedMod = localStorage.getItem('wineManager_modificationCount');
+                if (savedMod) modificationCount = parseInt(savedMod, 10) || 0;
+
                 // Se ci sono dati salvati, ricarica la visualizzazione
-                if (savedJson && savedCsv) {
+                if (savedJson) {
                     mergeData();
                     return true;
                 }
@@ -801,9 +1179,15 @@
                 localStorage.removeItem('wineManager_jsonData');
                 localStorage.removeItem('wineManager_winesData');
                 localStorage.removeItem('wineManager_updatedLinks');
+                localStorage.removeItem('wineManager_modificationCount');
                 updatedLinks.clear();
+                modificationCount = 0;
                 alert('Modifiche salvate cancellate. Ricarica la pagina per vedere i dati originali.');
             }
+        }
+
+        function hasModifications() {
+            return updatedLinks.size > 0 || modificationCount > 0;
         }
 
         function displayWinesByRegion(wines) {
@@ -885,14 +1269,10 @@
                         </td>
                         <td>
                             <div class="action-buttons">
-                                <button class="btn btn-small btn-highlight" 
-                                        onclick="highlightRow('${wine.wineNumber}')">
-                                    Evidenzia
-                                </button>
-                                <button class="btn btn-small btn-update" 
-                                        onclick="updateLink('${wine.wineNumber}')">
-                                    Aggiorna
-                                </button>
+                                <button class="btn btn-small btn-highlight" onclick="highlightRow('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Evidenzia</button>
+                                <button class="btn btn-small btn-update" onclick="updateLink('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Aggiorna</button>
+                                <button class="btn btn-small btn-update" onclick="openEditModal('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Modifica</button>
+                                <button class="btn btn-small btn-danger" onclick="removeWine('${String(wine.wineNumber).replace(/'/g, "\\'")}')">Rimuovi</button>
                             </div>
                         </td>
                     `;
@@ -938,8 +1318,8 @@
         }
 
         function saveToLocalFile() {
-            if (updatedLinks.size === 0) {
-                alert('Nessun link è stato modificato');
+            if (!hasModifications()) {
+                alert('Nessuna modifica da salvare');
                 return;
             }
 
@@ -960,7 +1340,7 @@
                 throw new Error('Errore nel salvataggio');
             })
             .then(data => {
-                alert(`✅ File wines.json salvato con successo in data/wines.json!\n${updatedLinks.size} link aggiornati.`);
+                alert(`✅ File wines.json salvato con successo in data/wines.json!\n${updatedLinks.size} link aggiornati, ${modificationCount} add/modifiche/rimozioni.`);
                 // Aggiorna anche il localStorage
                 saveToLocalStorage();
             })
@@ -972,8 +1352,8 @@
         }
 
         function downloadUpdatedJSON() {
-            if (updatedLinks.size === 0) {
-                alert('Nessun link è stato modificato');
+            if (!jsonData.wines || jsonData.wines.length === 0) {
+                alert('Nessun vino da scaricare');
                 return;
             }
 
@@ -988,23 +1368,29 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            alert(`File wines.json scaricato con ${updatedLinks.size} link aggiornati`);
+            alert(`File wines.json scaricato (${jsonData.wines.length} vini${hasModifications() ? ', con modifiche' : ''})`);
         }
 
         function downloadUpdatedCSV() {
-            if (winesData.length === 0) {
-                alert('Nessun dato CSV disponibile');
+            const winesToExport = winesData.length > 0
+                ? winesData
+                : (jsonData.wines || []).map(w => ({
+                    wineNumber: w.wine_number,
+                    wineName: w.wine_name || '',
+                    link: w.bottle_image_url || ''
+                }));
+            if (winesToExport.length === 0) {
+                alert('Nessun dato disponibile');
                 return;
             }
 
-            // Crea il contenuto CSV
             let csvContent = 'Wine Number,Wine Name,Link\n';
-            winesData.forEach(wine => {
-                // Gestisce virgole e virgolette nel nome
-                const wineName = wine.wineName.includes(',') || wine.wineName.includes('"') 
-                    ? `"${wine.wineName.replace(/"/g, '""')}"` 
-                    : wine.wineName;
-                csvContent += `${wine.wineNumber},${wineName},${wine.link}\n`;
+            winesToExport.forEach(wine => {
+                const wn = wine.wineName !== undefined ? wine.wineName : wine.wine_name || '';
+                const wineName = wn.includes(',') || wn.includes('"')
+                    ? `"${String(wn).replace(/"/g, '""')}"`
+                    : wn;
+                csvContent += `${wine.wineNumber || wine.wine_number},${wineName},${wine.link || wine.bottle_image_url || ''}\n`;
             });
 
             const dataBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

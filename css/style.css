@@ -19,6 +19,18 @@
  * 6. Media Queries - Desktop (1024px+)
  */
 
+/* ==================== iOS / Apple viewport fix ==================== */
+/* Evita overflow orizzontale e barra di scroll su iPhone/Safari */
+html {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+}
+body.home-page {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+}
+
 /* Error notification animations */
 @keyframes slideInRight {
     from { 
@@ -2204,7 +2216,7 @@ body:not(.home-page) .luxury-container {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 3rem;
     margin-bottom: 3rem;
     padding: 2rem 0;
@@ -3770,10 +3782,16 @@ body:not(.home-page) .luxury-container {
     flex: 1;
     display: flex;
     flex-direction: column;
+    overflow: visible;
+    perspective: 1200px;
+    min-width: 0; /* Consente al contenitore di restringersi con il viewport (evita overflow) */
+    max-width: 100%;
 }
 
 #map {
     width: 100%;
+    min-width: 0; /* Consente alla mappa di restringersi con il viewport */
+    max-width: 100%;
     z-index: 1;
     background: #0E0E0E !important;
     border-radius: 0;
@@ -3793,6 +3811,43 @@ body:not(.home-page) .luxury-container {
 
 .leaflet-container {
     background: #0E0E0E !important;
+    /* Inclinazione 12.5° (tilt 3D) */
+    transform: perspective(1200px) rotateX(12.5deg);
+    transform-origin: center center;
+    /* Responsive: consente alla mappa di restringersi con il viewport (evita overflow) */
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Override hack Safari Leaflet: .leaflet-tile-container 1600x1600 può causare overflow */
+.leaflet-container .leaflet-tile-container {
+    max-width: 100% !important;
+    max-height: 100% !important;
+}
+
+/* Desktop/tablet: mappa in .map-wrapper deve adattarsi alla larghezza */
+.map-wrapper .leaflet-container {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Mobile: leaflet-container (#mobileMap) deve riempire il wrapper per evitare taglio Piemonte */
+.mobile-map-wrapper .leaflet-container {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
 }
 
 /* Day mode styles for general leaflet container */
@@ -4080,6 +4135,7 @@ body:not(.home-page) .luxury-container {
     
     .map-wrapper {
         display: flex !important;
+        margin-top: 30px; /* Abbassa la mappa di 30px solo su tablet */
         /* Height controlled by flex: 1 in wine-map.html */
     }
     
@@ -4299,7 +4355,8 @@ body:not(.home-page) .luxury-container {
         bottom: 0 !important;
         z-index: 50 !important;
         padding-top: var(--mobile-nav-height) !important; /* Solo nav, search bar nascosta */
-        width: 100vw !important;
+        width: 100% !important;
+        max-width: 100vw !important;
         height: 100vh !important;
         height: 100dvh !important;
         overflow: hidden !important;
@@ -4321,20 +4378,21 @@ body:not(.home-page) .luxury-container {
         padding-top: 1.25rem !important;
     }
     
-    /* Mobile map wrapper unificato */
+    /* Mobile map wrapper - full height so map is fully visible on screen */
     .mobile-map-wrapper {
-        min-height: 585px; /* Aumentato del 30% da 450px */
-        max-height: 78vh; /* Aumentato del 30% da 60vh */
-        height: 78vh; /* Aumentato del 30% da 60vh */
+        flex: 1;
+        min-height: 0;
+        height: 100%;
+        width: 100%;
         border-radius: 20px;
     }
     
     #mobileMap {
-        min-height: 350px;
         height: 100%;
+        width: 100%;
         border-radius: 20px;
-        margin-left: 51px;
-        margin-top: 83px;
+        margin: 0;
+        box-sizing: border-box;
     }
     
     /* Desktop wines grid nascosto */
@@ -4352,6 +4410,11 @@ body:not(.home-page) .luxury-container {
     box-shadow: none !important;
     z-index: 500 !important;
     pointer-events: none !important;
+}
+
+/* Spostamento 7px a destra per le label di Valle d'Aosta, Piemonte, Liguria */
+.region-label-offset-right {
+    transform: translateX(7px);
 }
 
 .desktop-region-label-text {
@@ -4529,10 +4592,13 @@ body:not(.home-page) .luxury-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* iOS Safari dynamic viewport */
     background: #0E0E0E !important; /* Colore uniforme per tutto il background */
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     overflow: hidden;
     position: relative;
+    box-sizing: border-box;
 }
 
 /* ==================== MOBILE-FIRST BASE STYLES ==================== */
@@ -4679,14 +4745,29 @@ img {
     overflow: hidden;
     background: #0E0E0E !important; /* Colore uniforme per tutto il background */
     gap: 0;
-    min-height: 500px; /* Ensure content wrapper has minimum height */
+    min-height: 0; /* Allow flex child to fill remaining viewport height */
     position: relative; /* Allow absolute positioning of map when wines list is visible */
+    min-width: 0; /* Evita overflow orizzontale su iOS/flex */
+    max-width: 100%;
+}
+
+/* Consente all'area mappa (sidebar + main-content-desktop) di restringersi con il viewport */
+.main-content-desktop {
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* When wines list is hidden (default), map takes full space */
 .map-wrapper {
     width: 100%;
-    /* flex: 1 and display: flex are handled by wine-map.html inline styles */
+    flex: 1;
+    min-height: 0;
+    min-width: 0; /* Consente alla mappa di restringersi con il viewport (evita overflow) */
+    max-width: 100%;
+    overflow-x: hidden; /* Nasconde overflow orizzontale quando si riduce la larghezza */
+    display: flex;
+    flex-direction: column;
+    position: relative;
 }
 
 /* Hide wines list by default - shown only when region is selected */
@@ -5681,8 +5762,14 @@ img {
 .map-wrapper {
     position: relative;
     overflow: hidden;
+    overflow-x: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
-    /* flex: 1, display: flex, and min-height are handled by wine-map.html inline styles */
+    flex: 1;
+    min-height: 0;
+    min-width: 0; /* Consente alla mappa di restringersi con il viewport */
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
     background-color: #0E0E0E;
 }
 .map-wrapper::before {
@@ -7588,7 +7675,7 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     :root {
         --mobile-nav-height: 70px;
         --mobile-wine-type-height: 124px;
-        --mobile-search-height: 112px;
+        --mobile-search-height: 108px; /* Altezza reale nav + barra con pulsanti (Dynamic Mode, Organic, etc.) */
     }
 
     /* Show mobile buttons, hide desktop sidebar */
@@ -7609,16 +7696,25 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         display: none !important; /* Hide menu-based views, show map instead */
     }
 
+    /* Container mappa: parte sotto la nav, va fino in fondo. I pulsanti restano in overlay sopra la mappa */
     .mobile-map-wines-container {
-        display: flex !important; /* Show map container by default */
+        display: flex !important;
         flex-direction: column;
         flex: 1;
-        overflow: visible !important; /* Always visible to accommodate rotated map */
+        overflow: hidden;
         min-height: 0;
-        margin-top: calc(90px - 60px); /* Reduced to allow expansion above */
-        height: calc(100vh - 140px + 140px); /* Increased height to show Sicily */
-        padding: 60px 20px 80px 20px; /* More padding top and bottom for Sicily */
+        margin: 0;
+        padding: 0;
+        position: fixed;
+        top: calc(var(--mobile-nav-height) + env(safe-area-inset-top, 0px));
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        max-height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
         box-sizing: border-box;
+        z-index: 1;
     }
     
     
@@ -7632,7 +7728,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         bottom: 0 !important;
         z-index: 50 !important;
         padding-top: var(--mobile-nav-height) !important; /* Solo nav, search bar nascosta */
-        width: 100vw !important;
+        width: 100% !important;
+        max-width: 100vw !important;
         height: 100vh !important;
         height: 100dvh !important;
         overflow: hidden !important;
@@ -7679,7 +7776,9 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     }
     
     .mobile-search-bar-container {
-        padding: 1rem 1.25rem;
+        padding: 0.5rem 0.75rem;
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+        padding-right: max(0.75rem, env(safe-area-inset-right));
     }
     
     /* Improved typography for mobile - Apple style */
@@ -7734,26 +7833,27 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         transform: scale(0.97);
     }
 
-    /* Fixed top nav for mobile - always with glass effect since map is always rotated */
+    /* Top nav fixed sopra la mappa: effetto vetro per vedere la mappa sotto */
     .top-nav {
-        position: absolute;
-        right: 0;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
         justify-content: flex-start;
         align-items: flex-end;
-        z-index: 200;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
         min-height: var(--mobile-nav-height);
         padding-top: constant(safe-area-inset-top); /* iOS 11.0-11.2 */
         padding-top: env(safe-area-inset-top); /* iOS 11.2+ */
+        padding-left: env(safe-area-inset-left, 0);
+        padding-right: env(safe-area-inset-right, 0);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        /* Glass effect always active since map is always rotated */
-        background: unset;
-        backdrop-filter: blur(30px) saturate(200%) !important;
-        -webkit-backdrop-filter: blur(30px) saturate(200%) !important;
-        border-bottom: 1px solid rgba(212, 175, 55, 0.15) !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-        opacity: 0.5;
+        /* Effetto vetro: sfondo semi-trasparente + blur per vedere la mappa sotto */
+        background: rgba(14, 14, 14, 0.55) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+        border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
     }
 
     .nav-title-section {
@@ -7765,7 +7865,7 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         display: none;
     }
 
-    /* Mobile Search Bar (positioned below nav) */
+    /* Mobile Search Bar: overlay sopra la mappa (la mappa va sotto), sfondo per leggibilità */
     .mobile-search-bar-container {
         position: fixed;
         top: calc(var(--mobile-nav-height) + constant(safe-area-inset-top)); /* iOS 11.0-11.2 */
@@ -7773,13 +7873,18 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         left: 0;
         right: 0;
         z-index: 190;
-        background: transparent;
+        background: linear-gradient(180deg, rgba(14, 14, 14, 0.92) 0%, rgba(14, 14, 14, 0.75) 70%, transparent 100%);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         padding: 0.5rem 0.75rem;
         padding-left: calc(0.75rem + constant(safe-area-inset-left)); /* iOS 11.0-11.2 */
         padding-left: calc(0.75rem + env(safe-area-inset-left)); /* iOS 11.2+ */
         padding-right: calc(0.75rem + constant(safe-area-inset-right)); /* iOS 11.0-11.2 */
         padding-right: calc(0.75rem + env(safe-area-inset-right)); /* iOS 11.2+ */
         display: block; /* Always visible on mobile and tablet */
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     /* 
@@ -7820,9 +7925,11 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 
     .mobile-search-wrapper {
         max-width: 100%;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        box-sizing: border-box;
     }
 
     .mobile-search-input-wrapper {
@@ -7926,19 +8033,21 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         transform: scale(0.98);
     }
 
-    /* Quick Search Buttons - Compact single line */
+    /* Quick Search Buttons - Riga orizzontale con wrap per restare visibili su iPhone */
     .mobile-quick-search-buttons {
         display: flex;
-        gap: 4px;
+        gap: 6px;
         width: 100%;
+        max-width: 100%;
         margin-top: 0;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         justify-content: flex-start;
-        align-items: flex-end;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
         padding: 0;
         color: rgba(172, 131, 45, 1);
-        text-align: left;
+        text-align: center;
+        box-sizing: border-box;
     }
 
     .mobile-quick-search-btn {
@@ -7958,10 +8067,12 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         overflow: visible;
         white-space: nowrap;
         min-width: fit-content;
+        max-width: 100%;
         min-height: 36px;
         display: flex;
         align-items: center;
         justify-content: center;
+        box-sizing: border-box;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
@@ -8028,6 +8139,33 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     /* Hide desktop main content on mobile */
     .main-content-desktop {
         display: none !important;
+    }
+
+    /* Quick Search Buttons container below map (wine-map mobile) */
+    .mobile-quick-search-below-map {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        text-align: left;
+        width: 100%;
+        padding: 0.375rem 0.5625rem;
+        padding-left: calc(0.5625rem + constant(safe-area-inset-left));
+        padding-left: calc(0.5625rem + env(safe-area-inset-left));
+        padding-right: calc(0.5625rem + constant(safe-area-inset-right));
+        padding-right: calc(0.5625rem + env(safe-area-inset-right));
+        box-sizing: border-box;
+        background: rgba(18, 18, 18, 0.95);
+        flex-shrink: 0;
+    }
+
+    .mobile-quick-search-below-map .mobile-quick-search-buttons {
+        margin-top: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
     }
 
     /* Mobile Wine Type Selector - Vertical Left Side Design */
@@ -8748,6 +8886,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         pointer-events: none !important; /* Don't interfere with map interactions */
     }
 
+    /* .region-label-offset-right (7px destra) definito con .desktop-region-label; vale anche per mobile */
+
     .mobile-region-label-text {
         font-size: 1rem;
         font-weight: 500;
@@ -8777,17 +8917,22 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         background: transparent !important;
     }
 
-    /* Mobile Map View - Apple-like design with smooth transitions */
+    /* Mobile Map View - tutta larghezza e altezza, padding minimo solo safe area */
     .mobile-map-view {
         flex: 1;
         position: relative;
-        overflow: visible !important; /* Always visible to show rotated map */
+        overflow: hidden;
         display: flex;
         flex-direction: column;
         min-height: 0;
-        padding: 60px 20px 80px 20px; /* More padding top and bottom for Sicily */
+        padding: 0;
+        padding-left: max(0.25rem, env(safe-area-inset-left, 0));
+        padding-right: max(0.25rem, env(safe-area-inset-right, 0));
+        padding-bottom: env(safe-area-inset-bottom, 0);
         box-sizing: border-box;
-        margin-top: -60px; /* Allow expansion above */
+        margin: 0;
+        width: 100%;
+        height: 100%;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
@@ -8837,8 +8982,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         width: 100%;
         height: 100%;
         min-height: 0;
-        border-radius: 20px;
-        overflow: visible !important; /* Always visible to show rotated map */
+        border-radius: 16px;
+        overflow: hidden;
         border: 0.5px solid transparent;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
                     0 2px 8px rgba(0, 0, 0, 0.2),
@@ -8846,10 +8991,11 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         background-color: var(--bg-primary, #0E0E0E);
         background-image: url('../image/BarSecondFloorFinal.png');
         background-size: cover;
-        background-position: calc(50% - 50px) center;
+        background-position: center center;
         background-repeat: no-repeat;
+        /* Map fills entire screen - no max-height limit */
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        padding: 60px 20px 80px 20px; /* More padding top and bottom for Sicily */
+        padding: 0;
         box-sizing: border-box;
         margin: 0;
     }
@@ -8868,27 +9014,25 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
-    #mobileMap {
-        width: calc(100% + 40px);
-        height: calc(100% + 100px); /* Increased height to show Sicily */
-        min-height: 100%;
+    /* #mobileMap = .leaflet-container: riempie il wrapper; leggera inclinazione */
+    #mobileMap,
+    .mobile-map-wrapper .leaflet-container {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        max-width: 100% !important;
         background: transparent !important;
-        overflow: visible !important;
-        margin: 0;
-        position: absolute;
-        top: -60px; /* Allow expansion above header */
-        left: -20px;
-        right: 0;
-        bottom: 0;
-        display: flex !important;
-        flex-wrap: wrap !important;
-        transform: rotate(9deg) !important;
+        margin: 0 !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        z-index: 150;
+        transform: scale(0.98) rotate(-1.5deg);
         transform-origin: center center;
-        /* Add padding to prevent clipping, especially for Sicily at the bottom */
-        padding: 40px 20px 60px 20px; /* More padding bottom for Sicily */
-        box-sizing: border-box;
-        z-index: 150; /* Below header but above other content */
-        transition: transform 0.3s ease, display 0.3s ease, flex-wrap 0.3s ease;
     }
 
     /* Day mode styles for #mobileMap */
@@ -8896,16 +9040,20 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         background: transparent !important;
     }
 
-    /* Leaflet map container adjustments for mobile */
+    /* Leaflet map container: riempie tutto il wrapper (evita taglio Piemonte) */
     .mobile-map-wrapper .leaflet-container {
         background: transparent !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         width: 100% !important;
         height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        box-sizing: border-box !important;
     }
 
     /* Day mode styles */
@@ -9775,18 +9923,26 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         margin-top: 0;
     }
 
-    /* Ensure mobile map container takes available space without overlapping selectors */
+    /* Container mappa: da top 0 sotto la nav (nav con effetto vetro), tutte le regioni visibili */
     .mobile-map-wines-container {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100dvh !important;
+        height: 100vh !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
         flex: 1;
-        display: flex;
+        display: flex !important;
         flex-direction: column;
         min-height: 0;
         overflow: hidden;
-    }
-
-    /* Mobile map wines container - positioned below search bar and wine type selector */
-    .mobile-map-wines-container {
-        margin-top: 0; /* Rimosso margine di 200px */
+        box-sizing: border-box;
+        z-index: 1;
     }
     
     /* Quando mobile-wines-cards-container è visibile, espandi fino ai pulsanti */
@@ -9799,7 +9955,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         bottom: 0 !important;
         z-index: 50 !important;
         padding-top: var(--mobile-nav-height) !important; /* Solo nav, search bar nascosta */
-        width: 100vw !important;
+        width: 100% !important;
+        max-width: 100vw !important;
         height: 100vh !important;
         height: 100dvh !important;
         overflow: hidden !important;
@@ -10049,7 +10206,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         bottom: 0 !important;
         z-index: 50 !important;
         padding-top: var(--mobile-nav-height) !important; /* Solo nav, search bar nascosta */
-        width: 100vw !important;
+        width: 100% !important;
+        max-width: 100vw !important;
         height: 100vh !important;
         height: 100dvh !important;
         overflow: hidden !important;
@@ -10235,7 +10393,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         bottom: 0 !important;
         z-index: 50 !important;
         padding-top: var(--mobile-nav-height) !important; /* Solo nav, search bar nascosta */
-        width: 100vw !important;
+        width: 100% !important;
+        max-width: 100vw !important;
         height: 100vh !important;
         height: 100dvh !important;
         overflow: hidden !important;
@@ -10343,17 +10502,17 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
                     0 2px 8px rgba(0, 0, 0, 0.2);
     }
     
-    /* Rimuovi gap 155px nella mobile view map solo per tablet */
+    /* Mappa ingrandita 25%: meno padding */
     .mobile-map-view {
-        padding: 1rem 1.25rem !important;
+        padding: 0.75rem 0.9375rem !important;
     }
 }
 
-/* Schermi 1920x1200 (aspect ratio 16:10) - Rimuovi gap 155px nella mobile view map */
+/* Schermi 1920x1200 (aspect ratio 16:10) - Mappa ingrandita 25% */
 @media (width: 1920px) and (height: 1200px),
        (aspect-ratio: 16/10) and (min-width: 1920px) {
     .mobile-map-view {
-        padding: 1rem 1.25rem !important;
+        padding: 0.75rem 0.9375rem !important;
     }
 }
 
@@ -10517,10 +10676,10 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         display: grid !important;
     }
     
-    /* Rimuovi gap nella mobile view map */
+    /* Mappa ingrandita 25%: meno padding */
     .mobile-map-view {
-        padding: 1rem 1.25rem !important;
-        padding-top: 1rem !important;
+        padding: 0.75rem 0.9375rem !important;
+        padding-top: 0.75rem !important;
     }
     
     /* Assicura che la mappa desktop sia visibile */
@@ -10635,10 +10794,10 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         gap: 1.5rem;
     }
     
-    /* Rimuovi gap 155px nella mobile view map per tablet grandi (>= 1024px) */
+    /* Mappa ingrandita 25%: meno padding */
     .mobile-map-view {
-        padding: 1rem 1.25rem !important;
-        padding-top: 1rem !important;
+        padding: 0.75rem 0.9375rem !important;
+        padding-top: 0.75rem !important;
     }
 }
 
@@ -10647,13 +10806,12 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 @media (min-width: 1024px) and (max-width: 1366px) {
     .main-content-desktop .map-wrapper {
         display: flex !important;
-        min-height: 600px !important;
-        max-height: 75vh !important;
+        flex: 1 !important;
+        min-height: 0 !important;
     }
     
     .main-content-desktop #map {
-        min-height: 600px !important;
-        max-height: 75vh !important;
+        height: 100% !important;
     }
 }
 
@@ -10733,16 +10891,15 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         display: none !important;
     }
     
-    /* Mobile map container unificato per tablet e mobile */
+    /* Mobile map container - full screen, map fully visible */
     .mobile-map-wrapper {
-        min-height: 715px; /* Aumentato del 30% da 550px */
-        max-height: 91vh; /* Aumentato del 30% da 70vh */
-        height: 91vh; /* Aumentato del 30% da 70vh */
+        flex: 1;
+        min-height: 0;
+        height: 100%;
         border-radius: 20px;
     }
 
     #mobileMap {
-        min-height: 715px; /* Aumentato del 30% da 550px */
         height: 100%;
         border-radius: 20px;
     }
@@ -10770,9 +10927,9 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         display: none !important;
     }
     
-    /* Mobile map view container - Rimuovi gap 155px per dispositivi non iPhone */
+    /* Mobile map view - Mappa ingrandita 25% */
     .mobile-map-view {
-        padding: 1rem 1.25rem !important;
+        padding: 0.75rem 0.9375rem !important;
     }
 }
 
@@ -10780,20 +10937,20 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 
 /* Small mobile size (max-width: 480px) - Optimized for small screens */
 @media (max-width: 480px) {
-    /* Mobile map container - ingrandito per piccoli schermi */
+    /* Mobile map container - full screen so map is fully visible */
     .mobile-map-wrapper {
-        min-height: 455px; /* Aumentato del 30% da 350px */
-        max-height: 65vh; /* Aumentato del 30% da 50vh */
-        height: 65vh; /* Aumentato del 30% da 50vh */
+        flex: 1;
+        min-height: 0;
+        height: 100%;
         border-radius: 16px;
     }
     
     #mobileMap {
-        min-height: 455px; /* Aumentato del 30% da 350px */
         height: 100%;
+        width: 100%;
         border-radius: 16px;
-        margin-left: 51px;
-        margin-top: 83px;
+        margin: 0;
+        box-sizing: border-box;
     }
     
     /* Label regioni ben visibili anche su schermi piccoli */
@@ -10913,11 +11070,10 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
             margin-bottom: 0;
         }
     }
-    /* Solo mobile-map-view mantiene padding-top 155px per iPhone iOS */
-    /* Questa regola si applica solo a dispositivi iOS grazie a constant() e env() */
+    /* Solo mobile-map-view - padding ridotto 25% per mappa più grande (iPhone iOS) */
     .mobile-map-view {
-        padding-top: calc(155px + constant(safe-area-inset-top)); /* iOS 11.0-11.2 */
-        padding-top: calc(155px + env(safe-area-inset-top)); /* iOS 11.2+ */
+        padding-top: calc(116.25px + constant(safe-area-inset-top)); /* 155*0.75 */
+        padding-top: calc(116.25px + env(safe-area-inset-top)); /* iOS 11.2+ */
         padding-bottom: constant(safe-area-inset-bottom); /* iOS 11.0-11.2 */
         padding-bottom: env(safe-area-inset-bottom); /* iOS 11.2+ */
         padding-left: constant(safe-area-inset-left); /* iOS 11.0-11.2 */
@@ -10926,10 +11082,10 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         padding-right: env(safe-area-inset-right); /* iOS 11.2+ */
     }
     
-    /* Per dispositivi non iOS, rimuovi il padding-top 155px */
+    /* Per dispositivi non iOS */
     @supports not (padding-top: env(safe-area-inset-top)) {
         .mobile-map-view {
-            padding-top: 1rem !important;
+            padding-top: 0.75rem !important;
         }
     }
     
@@ -11087,15 +11243,15 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 
 /* PORTRAIT (verticale) - schermo alto e stretto */
 @media (max-width: 767px) and (orientation: portrait) {
-    /* Mappa più alta in portrait per sfruttare lo spazio verticale */
+    /* Mappa a schermo intero in portrait */
     .mobile-map-wrapper {
-        height: 75vh !important;
-        min-height: 600px !important;
-        max-height: 75vh !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: 100% !important;
     }
 
     #mobileMap {
-        min-height: 600px !important;
+        height: 100% !important;
     }
 
     /* Label regioni più grandi in portrait */
@@ -11106,8 +11262,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     /* Container query per schermi molto alti in portrait */
     @container (min-height: 800px) {
         .mobile-map-wrapper {
-            height: 70vh !important;
-            min-height: 550px !important;
+            flex: 1 !important;
+            height: 100% !important;
         }
         
         .mobile-region-label-text {
@@ -11118,15 +11274,15 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 
 /* LANDSCAPE (orizzontale) - schermo largo e basso */
 @media (max-width: 767px) and (orientation: landscape) {
-    /* Mappa più bassa in landscape per dare spazio ai vini */
+    /* Mappa a schermo intero anche in landscape */
     .mobile-map-wrapper {
-        height: 40vh !important;
-        min-height: 280px !important;
-        max-height: 40vh !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: 100% !important;
     }
     
     #mobileMap {
-        min-height: 280px !important;
+        height: 100% !important;
     }
     
     /* Label regioni visibili anche in landscape */
@@ -11214,8 +11370,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     /* Container query per schermi molto larghi in landscape */
     @container (min-width: 800px) {
         .mobile-map-wrapper {
-            height: 45vh !important;
-            min-height: 320px !important;
+            flex: 1 !important;
+            height: 100% !important;
         }
         
         .mobile-region-label-text {
@@ -11332,11 +11488,12 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
         isolation: isolate;
     }
 
-    /* 4. Container query altezza dinamica */
+    /* 4. Container query - map fills available space */
     @container (max-height: 600px) {
         .mobile-map-wrapper {
-            height: 65vh; /* Aumentato del 30% da 50vh */
-            min-height: 455px; /* Aumentato del 30% da 350px */
+            flex: 1 !important;
+            min-height: 0 !important;
+            height: 100% !important;
         }
     }
 
@@ -11427,12 +11584,13 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
 /* --------------- SMALL PHONES ≤ 390px --------------- */
 @media (max-width: 479px) {
     .mobile-map-wrapper {
-        height: 48vh;
-        min-height: 320px;
+        flex: 1;
+        min-height: 0;
+        height: 100%;
     }
     
     #mobileMap {
-        min-height: 320px;
+        height: 100%;
     }
     
     /* Label regioni ottimizzate per telefoni piccoli */
@@ -11926,8 +12084,8 @@ body:has(.mobile-side-menu.open) .mobile-wines-cards-grid .mobile-wine-card-grid
     }
     
     .map-wrapper {
-        min-height: 400px !important;
-        max-height: 50vh !important;
+        flex: 1 !important;
+        min-height: 0 !important;
     }
     
     /* === 4. CARD VINI TABLET === */
@@ -12516,11 +12674,12 @@ button,
         flex-direction: column;
     }
     
-    /* 2. Wrapper mappa si espande completamente */
+    /* 2. Wrapper mappa si espande completamente (più largo per evitare taglio Piemonte) */
     .mobile-map-wrapper {
         flex: 1;
         min-height: 0;
         display: flex;
+        width: 100%;
     }
     
     /* 3. Mappa Leaflet occupa tutto lo spazio */
@@ -12565,9 +12724,9 @@ button,
         border: 1px solid rgba(212, 175, 55, 0.3) !important;
     }
     
-    /* 8. Padding ottimizzato versione tablet per più spazio mappa */
+    /* 8. Padding ridotto 25% per mappa ingrandita (~25% su tutti i lati) */
     .mobile-map-view {
-        padding: 0.75rem 1rem 0.5rem 1rem;
+        padding: 0.5625rem 0.75rem 0.375rem 0.75rem;
     }
     
     /* 9. Wine type selector più compatto */
@@ -12603,7 +12762,7 @@ button,
     }
     
     .mobile-map-view {
-        padding: 0.75rem 1rem 0.5rem 1rem;
+        padding: 0.5625rem 0.75rem 0.375rem 0.75rem;
     }
     
     /* Mappa più grande su tablet */
